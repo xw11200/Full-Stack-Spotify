@@ -27,7 +27,7 @@ env.bak/
 # Local data caches
 data/lyrics_cache.json
 data/credentials.json
+.env
 
 # Audio metadata caches
 *.m3u
-
