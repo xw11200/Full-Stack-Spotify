@@ -184,15 +184,11 @@ def _fallback_message(reason: str) -> str:
 
 def get_lyrics(artist: str, title: str) -> str:
     """
-    Fetch lyrics from Genius with caching.
-    - Tries exact (artist, title)
-    - Falls back to smart search by 'title artist'
-    - Caches hits and misses so we avoid repeated lookups
+    Fetch lyrics for a given artist and title using the Genius API, with caching.
     
     Args:
         artist (str): The artist name.
         title (str): The song title.
-        
     Returns:
         str: The lyrics text, or an error message.
     """
@@ -201,36 +197,48 @@ def get_lyrics(artist: str, title: str) -> str:
 
     cached = cache.get(key)
     if isinstance(cached, str):
+        print(f"Found in cache: {artist} - {title}")
         return cached
     elif isinstance(cached, dict) and "lyrics" in cached:
+        print(f"Found in cache (dict): {artist} - {title}")
         return cached["lyrics"]
 
     _init_genius()
     if not _genius_ready:
-        msg = _fallback_message("no API token or client init failed")
-        return msg
+        return _fallback_message("no API token or client init failed")
 
-    # — Try exact match first
+    # --- DEBUGGING PRINTS ---
+    print(f"SEARCHING GENIUS: Artist='{artist}', Title='{title}'")
+
     lyrics_text = None
     try:
-        # search_song(title, artist) often does a good job for exact
+        # 1. Try exact search
         song = _genius.search_song(title=title, artist=artist)
         if song and song.lyrics:
+            print("Match found (Exact)")
             lyrics_text = song.lyrics
         else:
-            # — Fallback: looser search combining both
+            # 2. Try looser search
             query = f"{title} {artist}".strip()
+            print(f"Exact match failed. Trying fallback query: '{query}'")
             song2 = _genius.search_song(query)
             if song2 and song2.lyrics:
+                print("Match found (Fallback)")
                 lyrics_text = song2.lyrics
-    except Exception:
+    
+    except Exception as e:
+        # THIS IS THE MOST IMPORTANT LINE:
+        print(f"GENIUS SEARCH FAILED: {type(e).__name__}: {e}")
         lyrics_text = None
 
     if not lyrics_text:
+        print("No lyrics found after all attempts.")
         lyrics_text = _fallback_message("not found")
+    else:
+        # Clean up
+        lyrics_text = _strip_trailing_credits(lyrics_text)
+        # Save to cache
+        cache[key] = lyrics_text
+        _save_cache(cache)
 
-    lyrics_text = _strip_trailing_credits(lyrics_text)
-
-    cache[key] = lyrics_text
-    _save_cache(cache)
     return lyrics_text
