@@ -61,7 +61,7 @@ def _load_token() -> Optional[str]:
 
 def _init_genius():
     """
-    Initialize the Genius API client.
+    Initialize the Genius API client with a Fake Browser User-Agent.
     """
     global _genius, _genius_ready
     if _genius_ready:
@@ -71,20 +71,29 @@ def _init_genius():
         _genius_ready = False
         return
     try:
-        import lyricsgenius  # pip install lyricsgenius
+        import lyricsgenius
+        
+        # 1. Define a "Real Browser" User-Agent
+        fake_user_agent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+
         _genius = lyricsgenius.Genius(
             token,
             skip_non_songs=True,
             excluded_terms=["(Remix)", "(Live)"],
-            timeout=10,
-            retries=2,
-            remove_section_headers=True,   # remove [Chorus], [Verse 1], etc.
+            timeout=15,          # Increase timeout slightly
+            retries=3,           # Increase retries
+            remove_section_headers=True,
+            user_agent=fake_user_agent  # <--- CRITICAL FIX
         )
-        # Be polite with rate limits
-        _genius.sleep_time = 0.5
+        
+        # 2. Be extremely polite to avoid bans
+        _genius.sleep_time = 1.0 # Wait 1 second between requests
         _genius.verbose = False
         _genius_ready = True
-    except Exception:
+        print(f"Genius Client Initialized (User-Agent set)")
+        
+    except Exception as e:
+        print(f"CRITICAL GENIUS ERROR: {e}")
         _genius_ready = False
 
 def _load_cache() -> dict:
