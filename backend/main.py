@@ -7,6 +7,7 @@ from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
 # Import your existing classes
+from .database import Database
 from .library import MusicLibrary
 from .playlist import Playlist
 from .lyrics_fetcher import get_lyrics
@@ -30,7 +31,8 @@ FRONTEND_DIR = BASE_DIR.parent / "frontend"
 INDEX_FILE = FRONTEND_DIR / "index.html"
 
 # --- Initialize Library ---
-library = MusicLibrary()
+database = Database()
+library = MusicLibrary(database=database)
 print(f"Server scanning songs in: {DATA_PATH}")
 library.load_from_folder(str(DATA_PATH))
 
@@ -54,29 +56,19 @@ def read_root():
 def get_all_songs():
     """Returns a list of all songs scanned by MusicLibrary."""
     # Convert Song objects to JSON-friendly dictionaries
-    return [
-        {
-            "title": s.title,
-            "artist": s.artist,
-            "duration": s.length,
-            "file_path": s.file_path,
-            # We add an ID based on index for the frontend to reference easily
-            "id": index
-        }
-        for index, s in enumerate(library.songs)
-    ]
+    return database.list_songs()
 
 @app.get("/stream/{song_id}")
 def stream_music(song_id: int):
     """Serves the actual MP3 file to the browser."""
-    if song_id < 0 or song_id >= len(library.songs):
+    song = database.get_song(song_id)
+    if not song:
         raise HTTPException(status_code=404, detail="Song not found")
-    
-    song = library.songs[song_id]
-    if not os.path.exists(song.file_path):
+
+    if not os.path.exists(song["file_path"]):
         raise HTTPException(status_code=404, detail="File missing")
         
-    return FileResponse(song.file_path, media_type="audio/mpeg")
+    return FileResponse(song["file_path"], media_type="audio/mpeg")
 
 def _load_album_art(file_path: str):
     """
@@ -100,25 +92,25 @@ def _load_album_art(file_path: str):
 @app.get("/lyrics/{song_id}")
 def fetch_lyrics(song_id: int):
     """Return lyrics for a song via the lyrics_fetcher helper."""
-    if song_id < 0 or song_id >= len(library.songs):
+    song = database.get_song(song_id)
+    if not song:
         raise HTTPException(status_code=404, detail="Song not found")
 
-    song = library.songs[song_id]
-    lyrics_text = get_lyrics(song.artist, song.title)
+    lyrics_text = get_lyrics(song["artist"], song["title"])
     return {
-        "title": song.title,
-        "artist": song.artist,
+        "title": song["title"],
+        "artist": song["artist"],
         "lyrics": lyrics_text
     }
 
 @app.get("/cover/{song_id}")
 def get_album_cover(song_id: int):
     """Return embedded album art for the requested song."""
-    if song_id < 0 or song_id >= len(library.songs):
+    song = database.get_song(song_id)
+    if not song:
         raise HTTPException(status_code=404, detail="Song not found")
 
-    song = library.songs[song_id]
-    art_bytes, mime = _load_album_art(song.file_path)
+    art_bytes, mime = _load_album_art(song["file_path"])
     if not art_bytes:
         raise HTTPException(status_code=404, detail="Album art not found")
     return Response(content=art_bytes, media_type=mime)

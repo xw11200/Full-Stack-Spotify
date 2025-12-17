@@ -1,15 +1,41 @@
 import os
 import re
 import json
+from pathlib import Path
 from typing import Optional
 
 CACHE_FILE = os.path.join("data", "lyrics_cache.json")
 CRED_FILE = os.path.join("data", "credentials.json")
-GENIUS_API_TOKEN = "d1teN_44PiYvoYQa6pS_Z4ocjWAk5LMpDRhefTjIhmW97mgSX8tQgC8fI91yYi_X"
+ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
+_ENV_LOADED = False
 
 # Lazy import so the rest of the app runs even if lyrics aren't used yet
 _genius = None
 _genius_ready = False
+
+def _load_env_file() -> None:
+    """
+    Loads key=value pairs from the local .env into os.environ without overriding
+    variables that are already set in the environment.
+    """
+    global _ENV_LOADED
+    if _ENV_LOADED:
+        return
+    if ENV_FILE.exists():
+        try:
+            with ENV_FILE.open("r", encoding="utf-8") as fh:
+                for raw_line in fh:
+                    line = raw_line.strip()
+                    if not line or line.startswith("#") or "=" not in line:
+                        continue
+                    key, value = line.split("=", 1)
+                    key = key.strip()
+                    value = value.strip().strip('"').strip("'")
+                    if key and key not in os.environ:
+                        os.environ[key] = value
+        except OSError:
+            pass
+    _ENV_LOADED = True
 
 def _load_token() -> Optional[str]:
     """
@@ -18,8 +44,7 @@ def _load_token() -> Optional[str]:
     Returns:
         Optional[str]: The Genius API token, or None if not found.
     """
-    if GENIUS_API_TOKEN:
-        return GENIUS_API_TOKEN
+    _load_env_file()
     # Prefer env var
     tok = os.environ.get("GENIUS_API_TOKEN")
     if tok:

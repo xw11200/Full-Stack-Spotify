@@ -1,6 +1,8 @@
 import os
 import re
 from mutagen.mp3 import MP3
+
+from backend.database import Database
 from backend.song import Song
 
 DASH = r"[--]"  # hyphen or en-dash
@@ -38,8 +40,9 @@ class MusicLibrary:
     Attributes:
         songs (list[Song]): The list of songs in the library.
     """
-    def __init__(self):
+    def __init__(self, database: Database | None = None):
         self.songs = []
+        self.database = database
 
     def load_from_folder(self, folder_path: str) -> None:
         """
@@ -76,6 +79,7 @@ class MusicLibrary:
                 self.songs.append(song)
 
         print(f"Loaded {len(self.songs)} songs from {folder_path}")
+        self._sync_database()
 
     def display_songs(self):
         """
@@ -86,3 +90,8 @@ class MusicLibrary:
             return
         for i, song in enumerate(self.songs, 1):
             print(f"{i}. {song}")
+
+    def _sync_database(self) -> None:
+        """Persist the current library snapshot if a database is configured."""
+        if self.database:
+            self.database.sync_songs(self.songs)
