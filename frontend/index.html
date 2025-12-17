@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spotify Lite Web</title>
+    <style>
+        :root {
+            --bg: #0f0f0f;
+            --panel: #1d1e21;
+            --panel-dark: #141417;
+            --accent: #1DB954;
+            --text: #f5f5f5;
+            --muted: #a3a6b1;
+            --border: #2b2c33;
+        }
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif;
+            margin: 0;
+            padding: 24px;
+            min-height: 100vh;
+        }
+        h1, h2, h3, h4, p {
+            margin: 0;
+        }
+        .app-shell {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+        .app-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .app-header h1 {
+            color: var(--accent);
+        }
+        .brand-pill {
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            padding: 8px 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--panel-dark);
+            font-size: 14px;
+            color: var(--muted);
+        }
+        .app-grid {
+            display: grid;
+            grid-template-columns: 280px 1fr;
+            gap: 24px;
+        }
+        .panel {
+            background: var(--panel);
+            border-radius: 18px;
+            padding: 18px;
+            border: 1px solid var(--border);
+        }
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            color: var(--muted);
+            font-size: 14px;
+        }
+        .list {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            max-height: 420px;
+            overflow-y: auto;
+        }
+        .list-item {
+            padding: 10px 12px;
+            border-radius: 10px;
+            background: transparent;
+            cursor: pointer;
+            border: 1px solid transparent;
+            color: var(--muted);
+            font-size: 14px;
+            transition: all 0.15s ease;
+        }
+        .list-item:hover {
+            background: rgba(255,255,255,0.05);
+        }
+        .list-item.active {
+            background: rgba(29, 185, 84, 0.2);
+            border-color: rgba(29, 185, 84, 0.4);
+            color: var(--text);
+        }
+        .library-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 14px;
+        }
+        .pill-btn {
+            flex: 1;
+            border-radius: 999px;
+            border: 1px solid var(--border);
+            padding: 8px 0;
+            font-weight: 600;
+            cursor: pointer;
+            background: var(--panel-dark);
+            color: var(--text);
+            transition: background 0.15s ease;
+        }
+        .pill-btn.primary {
+            background: var(--accent);
+            color: #0b2d18;
+            border-color: transparent;
+        }
+        .pill-btn:hover {
+            opacity: 0.9;
+        }
+        .now-playing-card {
+            display: flex;
+            gap: 24px;
+            align-items: center;
+        }
+        .album-art {
+            width: 220px;
+            height: 220px;
+            border-radius: 18px;
+            background: linear-gradient(135deg, #f4cd73, #f87575);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            font-weight: 600;
+            color: #0f0f0f;
+            position: relative;
+            overflow: hidden;
+        }
+        .album-art img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 16px;
+            display: none;
+        }
+        .album-art-letter {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+        }
+        .now-playing-info h2 {
+            font-size: 32px;
+            margin-bottom: 6px;
+        }
+        .now-playing-info p {
+            color: var(--muted);
+            margin-bottom: 20px;
+        }
+        .brand-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            border-radius: 999px;
+            background: var(--panel-dark);
+            border: 1px solid var(--border);
+            padding: 6px 12px;
+            color: var(--muted);
+            font-size: 13px;
+        }
+        .lyrics-and-controls {
+            display: grid;
+            grid-template-columns: 1fr 280px;
+            gap: 18px;
+            margin-top: 18px;
+        }
+        .lyrics-content {
+            max-height: 250px;
+            overflow-y: auto;
+            line-height: 1.6;
+            color: var(--muted);
+            font-size: 14px;
+            white-space: pre-line;
+        }
+        .controls-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .time-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 13px;
+            color: var(--muted);
+        }
+        .progress-bar {
+            height: 6px;
+            border-radius: 999px;
+            background: rgba(255,255,255,0.1);
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background: var(--accent);
+            width: 0%;
+            transition: width 0.2s linear;
+        }
+        .controls-buttons {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+        }
+        .control-btn {
+            background: var(--accent);
+            border: none;
+            border-radius: 12px;
+            padding: 10px 0;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            color: #0b2d18;
+            transition: transform 0.1s ease;
+        }
+        .control-btn:active {
+            transform: scale(0.97);
+        }
+        .mini-player button {
+            width: 100%;
+            border-radius: 999px;
+            border: 1px solid var(--border);
+            background: var(--panel-dark);
+            color: var(--text);
+            padding: 8px 0;
+            cursor: pointer;
+        }
+        .upnext-panel .list {
+            max-height: 160px;
+        }
+        footer {
+            text-align: center;
+            color: var(--muted);
+            font-size: 14px;
+            border-top: 1px solid var(--border);
+            padding-top: 12px;
+        }
+        @media (max-width: 960px) {
+            .app-grid {
+                grid-template-columns: 1fr;
+            }
+            .lyrics-and-controls {
+                grid-template-columns: 1fr;
+            }
+            .now-playing-card {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            .album-art {
+                width: 100%;
+                height: 200px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-shell">
+        <header class="app-header">
+            <div>
+                <h1>Spotify Lite 🎧</h1>
+                <p>Full Stack Edition</p>
+            </div>
+            <div class="brand-pill">
+                <span>Spotify Lite</span>
+            </div>
+        </header>
+        <div class="app-grid">
+            <aside class="sidebar">
+                <section class="panel library-panel">
+                    <div class="panel-header">
+                        <h3>Library</h3>
+                        <span id="library-count">0 tracks</span>
+                    </div>
+                    <div id="song-list" class="list list--songs">
+                        <p>Loading library...</p>
+                    </div>
+                    <div class="library-actions">
+                        <button class="pill-btn primary">+ New</button>
+                        <button class="pill-btn">Edit</button>
+                        <button class="pill-btn">Delete</button>
+                    </div>
+                </section>
+                <section class="panel playlists-panel">
+                    <div class="panel-header">
+                        <h3>Playlists</h3>
+                    </div>
+                    <div id="playlist-list" class="list list--playlists"></div>
+                </section>
+            </aside>
+            <main class="main-panel">
+                <section class="panel now-playing-card">
+                    <div class="album-art" id="album-art">
+                        <img id="album-art-img" alt="Album cover">
+                        <span class="album-art-letter" id="album-art-letter">♪</span>
+                    </div>
+                    <div class="now-playing-info">
+                        <p class="eyebrow" style="color: var(--muted); text-transform: uppercase; letter-spacing: 2px;">Now Playing</p>
+                        <h2 id="track-title">Select a song</h2>
+                        <p id="track-artist">Your library is ready</p>
+                        <div class="brand-badge">
+                            <span>Spotify Lite</span>
+                        </div>
+                    </div>
+                </section>
+                <section class="lyrics-and-controls">
+                    <div class="panel lyrics-panel">
+                        <div class="panel-header">
+                            <h3>Lyrics</h3>
+                        </div>
+                        <div id="lyrics-content" class="lyrics-content">
+                            Pick a song to load placeholder lyrics.
+                        </div>
+                    </div>
+                    <div class="panel controls-panel">
+                        <div class="time-row">
+                            <span id="current-time">0:00</span>
+                            <span id="total-time">0:00</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progress-fill"></div>
+                        </div>
+                        <div class="controls-buttons">
+                            <button class="control-btn" id="btn-prev">⏮</button>
+                            <button class="control-btn" id="btn-play">▶</button>
+                            <button class="control-btn" id="btn-pause">⏸</button>
+                            <button class="control-btn" id="btn-next">⏭</button>
+                        </div>
+                        <div class="mini-player">
+                            <button id="btn-mini">Mini Player</button>
+                        </div>
+                        <audio id="audio-player" preload="metadata"></audio>
+                    </div>
+                </section>
+                <section class="panel upnext-panel">
+                    <div class="panel-header">
+                        <h3>Up Next</h3>
+                    </div>
+                    <div id="up-next-list" class="list list--upnext">
+                        <p>Queue will show here.</p>
+                    </div>
+                </section>
+            </main>
+        </div>
+        <footer id="status-bar">Playing: --</footer>
+    </div>
+
+    <script>
+        const DEFAULT_API = "http://127.0.0.1:8000";
+        const origin = window.location.origin || "";
+        const API_URL = origin.startsWith("http") ? origin : DEFAULT_API;
+
+        const state = {
+            songs: [],
+            currentIndex: null,
+            playlists: ["Beats", "Radiohead", "chi", "eng"],
+            audio: null,
+            lyricsCache: {}
+        };
+
+        document.addEventListener("DOMContentLoaded", () => {
+            state.audio = document.getElementById("audio-player");
+            attachAudioListeners();
+            attachControlListeners();
+            renderPlaylists();
+            loadSongs();
+        });
+
+        async function loadSongs() {
+            const list = document.getElementById("song-list");
+            try {
+                const response = await fetch(`${API_URL}/songs`);
+                const songs = await response.json();
+                state.songs = songs;
+                document.getElementById("library-count").innerText = `${songs.length} tracks`;
+                if (!songs.length) {
+                    list.innerHTML = "<p>No songs found.</p>";
+                    return;
+                }
+                renderLibrary();
+                setSong(0);
+            } catch (error) {
+                console.error("Error fetching songs:", error);
+                list.innerHTML = "<p style='color:#ff6b6b'>Error connecting to server. Is uvicorn running?</p>";
+            }
+        }
+
+        function renderLibrary() {
+            const list = document.getElementById("song-list");
+            list.innerHTML = "";
+            state.songs.forEach((song, index) => {
+                const item = document.createElement("div");
+                item.className = "list-item" + (state.currentIndex === index ? " active" : "");
+                item.textContent = `${song.title} — ${song.artist}`;
+                item.onclick = () => setSong(index);
+                list.appendChild(item);
+            });
+        }
+
+        function setSong(index) {
+            const song = state.songs[index];
+            if (!song) return;
+            state.currentIndex = index;
+            renderLibrary();
+            updateNowPlaying(song);
+            renderLyrics(song);
+            updateUpNext();
+            playSong(song);
+            updateStatus(`Playing: ${song.title} — ${song.artist}`);
+        }
+
+        function updateNowPlaying(song) {
+            document.getElementById("track-title").innerText = song.title;
+            document.getElementById("track-artist").innerText = song.artist;
+            document.getElementById("album-art-letter").innerText = song.title.charAt(0).toUpperCase();
+            loadAlbumArt(song);
+        }
+
+        function loadAlbumArt(song) {
+            const artImg = document.getElementById("album-art-img");
+            const artLetter = document.getElementById("album-art-letter");
+            artImg.style.display = "none";
+            artLetter.style.display = "flex";
+            if (!song) return;
+            const targetId = song.id.toString();
+            artImg.dataset.targetId = targetId;
+            artImg.onload = () => {
+                if (artImg.dataset.targetId !== targetId) return;
+                artImg.style.display = "block";
+                artLetter.style.display = "none";
+            };
+            artImg.onerror = () => {
+                if (artImg.dataset.targetId !== targetId) return;
+                artImg.removeAttribute("src");
+                artImg.style.display = "none";
+                artLetter.style.display = "flex";
+            };
+            artImg.src = `${API_URL}/cover/${song.id}`;
+        }
+
+        async function renderLyrics(song) {
+            const block = document.getElementById("lyrics-content");
+            if (!song) {
+                block.innerText = "Pick a song to load lyrics.";
+                return;
+            }
+            if (state.lyricsCache[song.id]) {
+                block.innerText = state.lyricsCache[song.id];
+                return;
+            }
+            block.innerText = "Fetching lyrics...";
+            try {
+                const response = await fetch(`${API_URL}/lyrics/${song.id}`);
+                if (!response.ok) {
+                    throw new Error(`Lyrics request failed (${response.status})`);
+                }
+                const data = await response.json();
+                const text = data.lyrics || "Lyrics unavailable.";
+                state.lyricsCache[song.id] = text;
+                block.innerText = text;
+            } catch (error) {
+                console.error("Unable to load lyrics:", error);
+                block.innerText = "Lyrics unavailable. Ensure the backend has GENIUS_API_TOKEN configured.";
+            }
+        }
+
+        function updateUpNext() {
+            const list = document.getElementById("up-next-list");
+            list.innerHTML = "";
+            if (state.currentIndex === null) {
+                list.innerHTML = "<p>Queue will show here.</p>";
+                return;
+            }
+            const nextSongs = state.songs.slice(state.currentIndex + 1);
+            if (!nextSongs.length) {
+                list.innerHTML = "<p>End of queue.</p>";
+                return;
+            }
+            nextSongs.forEach(song => {
+                const div = document.createElement("div");
+                div.className = "list-item";
+                div.textContent = `${song.title} — ${song.artist}`;
+                list.appendChild(div);
+            });
+        }
+
+        function renderPlaylists() {
+            const list = document.getElementById("playlist-list");
+            list.innerHTML = "";
+            state.playlists.forEach(name => {
+                const div = document.createElement("div");
+                div.className = "list-item";
+                div.textContent = name;
+                list.appendChild(div);
+            });
+        }
+
+        function playSong(song) {
+            if (!state.audio) return;
+            state.audio.src = `${API_URL}/stream/${song.id}`;
+            state.audio.play().catch(() => {});
+            const total = formatTime(song.duration || 0);
+            document.getElementById("total-time").innerText = total;
+        }
+
+        function attachAudioListeners() {
+            const progressFill = document.getElementById("progress-fill");
+            state.audio = document.getElementById("audio-player");
+            state.audio.addEventListener("timeupdate", () => {
+                const current = state.audio.currentTime || 0;
+                const total = state.audio.duration || (state.songs[state.currentIndex]?.duration ?? 0);
+                document.getElementById("current-time").innerText = formatTime(current);
+                document.getElementById("total-time").innerText = formatTime(total);
+                const percent = total ? (current / total) * 100 : 0;
+                progressFill.style.width = `${percent}%`;
+            });
+            state.audio.addEventListener("ended", () => skipTrack(1));
+        }
+
+        function attachControlListeners() {
+            document.getElementById("btn-prev").onclick = () => skipTrack(-1);
+            document.getElementById("btn-next").onclick = () => skipTrack(1);
+            document.getElementById("btn-play").onclick = () => state.audio?.play();
+            document.getElementById("btn-pause").onclick = () => state.audio?.pause();
+            document.getElementById("btn-mini").onclick = () => alert("Mini player is a mock button in this demo.");
+        }
+
+        function skipTrack(direction) {
+            if (state.currentIndex === null) return;
+            let nextIndex = state.currentIndex + direction;
+            if (nextIndex < 0) nextIndex = state.songs.length - 1;
+            if (nextIndex >= state.songs.length) nextIndex = 0;
+            setSong(nextIndex);
+        }
+
+        function updateStatus(text) {
+            document.getElementById("status-bar").innerText = text;
+        }
+
+        function formatTime(seconds) {
+            if (!seconds || Number.isNaN(seconds)) return "0:00";
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60).toString().padStart(2, "0");
+            return `${mins}:${secs}`;
+        }
+    </script>
+</body>
+</html>

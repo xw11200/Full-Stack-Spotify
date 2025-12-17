@@ -1,0 +1,33 @@
+# macOS cruft
+.DS_Store
+
+# Python caches
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+pip-wheel-metadata/
+*.egg-info/
+
+# Virtualenvs
+ENV/
+env.bak/
+
+# FastAPI / Uvicorn logs
+*.log
+
+# VS Code / IDE settings
+.vscode/
+.idea/
+
+# Local data caches
+data/lyrics_cache.json
+data/credentials.json
+
+# Audio metadata caches
+*.m3u
+
