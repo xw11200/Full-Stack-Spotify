@@ -1,10 +1,15 @@
 import os
+import shutil
+import subprocess
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
+
+import imageio_ffmpeg
 
 # Import your existing classes
 from .database import Database
@@ -29,8 +34,33 @@ BASE_DIR = Path(__file__).resolve().parent
 DATA_PATH = BASE_DIR.parent / "data" / "songs"
 FRONTEND_DIR = BASE_DIR.parent / "frontend"
 INDEX_FILE = FRONTEND_DIR / "index.html"
+ENV_FILE = BASE_DIR.parent / ".env"
+_ENV_LOADED = False
+
+
+def _load_env_file() -> None:
+    """Load key=value pairs from .env into os.environ once."""
+    global _ENV_LOADED
+    if _ENV_LOADED:
+        return
+    if ENV_FILE.exists():
+        try:
+            with ENV_FILE.open("r", encoding="utf-8") as fh:
+                for raw_line in fh:
+                    line = raw_line.strip()
+                    if not line or line.startswith("#") or "=" not in line:
+                        continue
+                    key, value = line.split("=", 1)
+                    key = key.strip()
+                    value = value.strip().strip('"').strip("'")
+                    if key and key not in os.environ:
+                        os.environ[key] = value
+        except OSError:
+            pass
+    _ENV_LOADED = True
 
 # --- Initialize Library ---
+_load_env_file()
 database = Database()
 library = MusicLibrary(database=database)
 print(f"Server scanning songs in: {DATA_PATH}")
@@ -115,4 +145,108 @@ def get_album_cover(song_id: int):
         raise HTTPException(status_code=404, detail="Album art not found")
     return Response(content=art_bytes, media_type=mime)
 
-# You can add Lyrics and Playlist endpoints here later!
+class DownloadRequest(BaseModel):
+    url: str
+
+
+def _ensure_spotify_credentials() -> None:
+    """SpotDL needs Spotify API credentials available."""
+    missing = [
+        key for key in ("SPOTIFY_CLIENT_ID", "SPOTIFY_CLIENT_SECRET")
+        if not os.environ.get(key)
+    ]
+    if missing:
+        joined = ", ".join(missing)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Missing Spotify API credentials ({joined}). "
+                   "Add them to your environment or .env file."
+        )
+
+
+def _spotdl_commands(url: str) -> list[list[str]]:
+    """Build possible spotdl CLI commands (new + legacy syntax)."""
+    binary = os.environ.get("SPOTDL_BIN", "spotdl")
+    if not shutil.which(binary):
+        raise HTTPException(
+            status_code=500,
+            detail="spotdl executable not found. Install it with 'pip install spotdl'."
+        )
+
+    ffmpeg_path = _resolve_ffmpeg_path()
+    output_template = str(DATA_PATH / "{title} — {artist}")
+    shared_opts = [
+        "--format", "mp3",
+        "--bitrate", "320k",
+        "--output", output_template,
+        "--ffmpeg", ffmpeg_path,
+    ]
+
+    new_cmd = [binary, "download", url, *shared_opts]
+    legacy_cmd = [binary, url, *shared_opts]
+    return [new_cmd, legacy_cmd]
+
+
+@app.post("/download")
+def download_song(request: DownloadRequest):
+    url = request.url.strip()
+    if not url:
+        raise HTTPException(status_code=400, detail="A Spotify/Apple Music link is required.")
+
+    _ensure_spotify_credentials()
+    errors: list[str] = []
+    for command in _spotdl_commands(url):
+        try:
+            result = subprocess.run(
+                command,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                cwd=str(DATA_PATH),
+                check=False,
+            )
+        except FileNotFoundError:
+            raise HTTPException(
+                status_code=500,
+                detail="spotdl executable not found. Install it with 'pip install spotdl'."
+            )
+
+        if result.returncode == 0:
+            library.load_from_folder(str(DATA_PATH))
+            return {"status": "success", "message": "Track imported successfully."}
+
+        error_text = result.stderr.strip() or result.stdout.strip() or ""
+        errors.append(error_text)
+        if "usage:" not in error_text.lower():
+            break
+
+    detail = errors[-1] if errors else "SpotDL failed to download the requested track."
+    raise HTTPException(status_code=500, detail=detail)
+
+
+def _resolve_ffmpeg_path() -> str:
+    """Return a usable ffmpeg binary path or raise if none is available."""
+    env_path = os.environ.get("FFMPEG_BIN")
+    if env_path:
+        candidate = Path(env_path).expanduser()
+        if candidate.exists():
+            return str(candidate)
+        located = shutil.which(env_path)
+        if located:
+            return located
+
+    system_path = shutil.which("ffmpeg")
+    if system_path:
+        return system_path
+
+    if imageio_ffmpeg:
+        try:
+            return imageio_ffmpeg.get_ffmpeg_exe()
+        except Exception:
+            pass
+
+    raise HTTPException(
+        status_code=500,
+        detail="FFmpeg is required for SpotDL. Install ffmpeg, set FFMPEG_BIN, "
+               "or add imageio-ffmpeg to provide a bundled binary."
+    )

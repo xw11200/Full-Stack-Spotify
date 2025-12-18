@@ -3,3 +3,5 @@ uvicorn
 mutagen
 pygame
 lyricsgenius
+spotdl
+imageio-ffmpeg

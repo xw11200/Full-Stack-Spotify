@@ -5,7 +5,7 @@ from mutagen.mp3 import MP3
 from backend.database import Database
 from backend.song import Song
 
-DASH = r"[--]"  # hyphen or en-dash
+DASH = r"[-–—]"  # hyphen, en-dash, em-dash
 
 def parse_filename(filename: str) -> tuple[str, str, int]:
     """
@@ -56,6 +56,8 @@ class MusicLibrary:
             print("Folder not found.")
             return
 
+        self._normalize_filenames(folder_path)
+
         for filename in os.listdir(folder_path):
             if filename.lower().endswith(".mp3"):
                 path = os.path.join(folder_path, filename)
@@ -95,3 +97,20 @@ class MusicLibrary:
         """Persist the current library snapshot if a database is configured."""
         if self.database:
             self.database.sync_songs(self.songs)
+
+    def _normalize_filenames(self, folder_path: str) -> None:
+        """
+        Rename files containing spotdl placeholders (e.g. .{ext}) to .mp3 so they parse cleanly.
+        """
+        for filename in os.listdir(folder_path):
+            if ".{ext}" not in filename:
+                continue
+            old_path = os.path.join(folder_path, filename)
+            new_name = filename.replace(".{ext}", ".mp3")
+            new_path = os.path.join(folder_path, new_name)
+            if os.path.exists(new_path):
+                continue
+            try:
+                os.rename(old_path, new_path)
+            except OSError:
+                pass
